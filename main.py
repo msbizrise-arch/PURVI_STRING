@@ -1,6 +1,8 @@
+import os
 import config
 import time
 import logging
+import threading
 from pyrogram import Client, idle
 from pyromod import listen
 from flask import Flask
@@ -27,6 +29,18 @@ app = Client(
     plugins=dict(root="RAUSHAN"),
 )
 
+# ─── Flask keep-alive server for Render ───────────────────────────────────────
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def index():
+    return 'Bot is running!'
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8000))
+    flask_app.run(host="0.0.0.0", port=port)
+# ─────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     print("𝙰𝚕𝚙𝚑𝚊 𝚂𝚎𝚜𝚜𝚒𝚘𝚗 𝙶𝚎𝚗 𝚜𝚝𝚊𝚛𝚝𝚒𝚗𝚐...")
     try:
@@ -43,23 +57,11 @@ if __name__ == "__main__":
 
     uname = app.get_me().username
     print(f"@{uname} NOW ALPHA SESSION GEN IS READY TO GEN SESSION")
-    
+
+    # Start Flask in background thread so Render detects open port
+    threading.Thread(target=run_flask, daemon=True).start()
+
     idle()
-
-    # ─── Flask keep-alive server for Render ───────────────────────────────────────
-flask_app = Flask(name)
-
-@flask_app.route('/')
-def index():
-    return 'Bot is running!'
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8000))
-    flask_app.run(host="0.0.0.0", port=port)
-
-# Start Flask in background thread so Render detects open port
-threading.Thread(target=run_flask, daemon=True).start()
-# ─────────────────────────────────────────
 
     app.stop()
     print("𝐒𝐞𝐬𝐬𝐢𝐨𝐧 𝐆𝐞𝐧𝐞𝐫𝐚𝐭𝐢𝐧𝐠 𝐒𝐭𝐨𝐩𝐩...")
