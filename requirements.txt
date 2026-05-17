@@ -1,11 +1,13 @@
-dnspython==2.2.1
-motor==3.1.1
-flask
-psutil==5.9.4
-pyromod==1.5
-#pyrogram==2.0.106
-pyrofork
-python-dotenv==0.21.0
-telethon==1.26.1
+# GateKeeper Bot — Dependencies
+# Python 3.11+ required
+
+# Bot API (owner approval, callbacks)
+python-telegram-bot[job-queue]==21.10
+APScheduler==3.10.4
+
+# Userbot MTProto (command intercept — Rose se PEHLE)
+pyrogram==2.0.106
 TgCrypto==1.2.5
-pymongo==4.6.0
+
+# Utils
+python-dotenv==1.0.1

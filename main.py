@@ -1,67 +1,96 @@
-import os
-import config
-import time
+"""
+main.py — Entry Point
+======================
+
+Ye DONO chalaata hai ek saath:
+1. Pyrogram Userbot  → MTProto, command intercept (Rose se PEHLE)
+2. python-telegram-bot → Bot API, owner approval handle
+
+Dono ek hi asyncio event loop mein run karte hain.
+"""
+
+import asyncio
 import logging
+import os
 import threading
-from pyrogram import Client, idle
-from pyromod import listen
-from flask import Flask
-from pyrogram.errors import ApiIdInvalid, ApiIdPublishedFlood, AccessTokenInvalid
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Configure logging
+import config
+import userbot as ub
+from bot import build_app
+
 logging.basicConfig(
-    level=logging.INFO, 
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s | %(levelname)-8s | %(name)s — %(message)s",
+    level=logging.INFO,
 )
+logger = logging.getLogger(__name__)
 
-logging.getLogger("pymongo").setLevel(logging.ERROR)
 
-# Initialize start time
-StartTime = time.time()
+# ─── Health Check Server ─────────────────────────────────────────────────────
 
-# Initialize the Client
-app = Client(
-    "Anonymous",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN,
-    in_memory=True,
-    plugins=dict(root="RAUSHAN"),
-)
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"GateKeeper alive!")
+    def log_message(self, *args):
+        pass
 
-# ─── Flask keep-alive server for Render ───────────────────────────────────────
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def index():
-    return 'Bot is running!'
-
-def run_flask():
+def start_health_server():
     port = int(os.environ.get("PORT", 8000))
-    flask_app.run(host="0.0.0.0", port=port)
-# ─────────────────────────────────────────────────────────────────────────────
+    HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+async def main():
+    logger.info("=" * 50)
+    logger.info("  GateKeeper Bot — Starting...")
+    logger.info(f"  Owner ID : {config.OWNER_ID}")
+    logger.info("=" * 50)
+
+    # Health server — background thread
+    t = threading.Thread(target=start_health_server, daemon=True)
+    t.start()
+
+    # ── Bot API Application build karo ───────────────────────────────────────
+    app = build_app()
+
+    # ── Userbot ko bot app ka reference do ───────────────────────────────────
+    # Taaki userbot owner ko notification bhej sake bot ke through
+    ub.set_bot_app(app)
+
+    # ── Initialize bot app ────────────────────────────────────────────────────
+    await app.initialize()
+    await app.start()
+
+    # ── Userbot start karo ────────────────────────────────────────────────────
+    await ub.start_userbot()
+
+    logger.info("✅ Both Bot API and Userbot are running!")
+    logger.info("✅ Commands will be intercepted BEFORE MissRose")
+
+    # ── Polling start karo (bot API) ──────────────────────────────────────────
+    await app.updater.start_polling(
+        allowed_updates=["message", "callback_query"],
+        drop_pending_updates=True,
+    )
+
+    logger.info("✅ All systems running. Press Ctrl+C to stop.")
+
+    # ── Jab tak chale ─────────────────────────────────────────────────────────
+    try:
+        await asyncio.Event().wait()  # Infinite wait
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Shutting down...")
+    finally:
+        await ub.stop_userbot()
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
+        logger.info("Goodbye!")
+
 
 if __name__ == "__main__":
-    print("𝙰𝚕𝚙𝚑𝚊 𝚂𝚎𝚜𝚜𝚒𝚘𝚗 𝙶𝚎𝚗 𝚜𝚝𝚊𝚛𝚝𝚒𝚗𝚐...")
-    try:
-        app.start()
-    except ApiIdInvalid:
-        raise Exception("Your API_ID is not valid.")
-    except ApiIdPublishedFlood:
-        raise Exception("Your API_ID/API_HASH is flood banned.")
-    except AccessTokenInvalid:
-        raise Exception("Your BOT_TOKEN is not valid.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
-        raise
-
-    uname = app.get_me().username
-    print(f"@{uname} NOW ALPHA SESSION GEN IS READY TO GEN SESSION")
-
-    # Start Flask in background thread so Render detects open port
-    threading.Thread(target=run_flask, daemon=True).start()
-
-    idle()
-
-    app.stop()
-    print("𝐒𝐞𝐬𝐬𝐢𝐨𝐧 𝐆𝐞𝐧𝐞𝐫𝐚𝐭𝐢𝐧𝐠 𝐒𝐭𝐨𝐩𝐩...")
+    asyncio.run(main())
